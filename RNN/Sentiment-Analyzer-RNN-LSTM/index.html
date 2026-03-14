@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RNN vs LSTM Sentiment Analyzer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0a0e27;
+            --bg-card: #151b3d;
+            --accent-rnn: #00d4ff;
+            --accent-lstm: #ff006e;
+            --text-primary: #e8eaed;
+            --text-secondary: #9ca3af;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Space Mono', monospace;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(circle at 20% 30%, rgba(0, 212, 255, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(255, 0, 110, 0.05) 0%, transparent 50%);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding-top: 2rem;
+        }
+
+        h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: 3.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent-rnn), var(--accent-lstm));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            letter-spacing: -2px;
+            animation: fadeInDown 0.6s ease-out;
+        }
+
+        .subtitle {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            letter-spacing: 2px;
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        .input-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        .input-label {
+            display: block;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 180px;
+            background: var(--bg-dark);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 1.25rem;
+            font-family: 'Space Mono', monospace;
+            font-size: 1rem;
+            color: var(--text-primary);
+            resize: vertical;
+            transition: all 0.3s ease;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent-rnn);
+            box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+        }
+
+        textarea::placeholder {
+            color: var(--text-secondary);
+        }
+
+        .button-container {
+            margin-top: 1.5rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        button {
+            font-family: 'Syne', sans-serif;
+            font-weight: 600;
+            font-size: 1rem;
+            padding: 1rem 2.5rem;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .analyze-btn {
+            background: linear-gradient(135deg, var(--accent-rnn), var(--accent-lstm));
+            color: white;
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .analyze-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.3);
+        }
+
+        .analyze-btn:active {
+            transform: translateY(0);
+        }
+
+        .analyze-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .clear-btn {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 2px solid var(--border);
+            padding: 1rem 2rem;
+        }
+
+        .clear-btn:hover {
+            border-color: var(--text-primary);
+            color: var(--text-primary);
+        }
+
+        .loading {
+            display: none;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .loading.active {
+            display: flex;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent-rnn);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .results {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.5s ease;
+        }
+
+        .results.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .result-card {
+            background: var(--bg-card);
+            border: 2px solid var(--border);
+            border-radius: 16px;
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .result-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--accent-color);
+        }
+
+        .result-card.rnn {
+            --accent-color: var(--accent-rnn);
+        }
+
+        .result-card.lstm {
+            --accent-color: var(--accent-lstm);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+        }
+
+        .model-name {
+            font-family: 'Syne', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--accent-color);
+        }
+
+        .model-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.75rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            color: var(--text-secondary);
+            letter-spacing: 1px;
+        }
+
+        .score-display {
+            text-align: center;
+            margin: 2rem 0;
+        }
+
+        .score-circle {
+            width: 160px;
+            height: 160px;
+            margin: 0 auto 1rem;
+            border-radius: 50%;
+            border: 8px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            position: relative;
+            background: var(--bg-dark);
+        }
+
+        .score-value {
+            font-family: 'Syne', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--accent-color);
+        }
+
+        .score-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 0.25rem;
+        }
+
+        .sentiment-label {
+            font-family: 'Syne', sans-serif;
+            font-size: 1.75rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .sentiment-label.positive {
+            color: var(--success);
+        }
+
+        .sentiment-label.negative {
+            color: var(--danger);
+        }
+
+        .sentiment-label.neutral {
+            color: var(--warning);
+        }
+
+        .progress-bar {
+            height: 8px;
+            background: var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 1rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent-color);
+            border-radius: 4px;
+            transition: width 0.8s ease;
+        }
+
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            padding: 1rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+            animation: shake 0.5s ease;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2.5rem;
+            }
+
+            .results {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+
+            .button-container {
+                flex-direction: column;
+            }
+
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>RNN vs LSTM</h1>
+            <p class="subtitle">SENTIMENT ANALYZER</p>
+        </header>
+
+        <div class="error-message" id="errorMessage"></div>
+
+        <div class="input-section">
+            <label class="input-label">Enter your movie review</label>
+            <textarea 
+                id="reviewInput" 
+                placeholder="Type or paste your movie review here... The models will analyze the sentiment in real-time and show you how each one perceives the emotional tone."
+            ></textarea>
+            
+            <div class="button-container">
+                <button class="analyze-btn" id="analyzeBtn" onclick="analyzeSentiment()">
+                    Analyze Sentiment
+                </button>
+                <button class="clear-btn" onclick="clearInput()">Clear</button>
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <span>Analyzing...</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="results" id="results">
+            <div class="result-card rnn">
+                <div class="card-header">
+                    <span class="model-name">SimpleRNN</span>
+                    <span class="model-badge">BASIC MODEL</span>
+                </div>
+                
+                <div class="score-display">
+                    <div class="score-circle">
+                        <div class="score-value" id="rnnScore">--</div>
+                        <div class="score-label">Confidence</div>
+                    </div>
+                    <div class="sentiment-label" id="rnnLabel">Analyzing...</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="rnnProgress" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="result-card lstm">
+                <div class="card-header">
+                    <span class="model-name">LSTM</span>
+                    <span class="model-badge">ADVANCED MODEL</span>
+                </div>
+                
+                <div class="score-display">
+                    <div class="score-circle">
+                        <div class="score-value" id="lstmScore">--</div>
+                        <div class="score-label">Confidence</div>
+                    </div>
+                    <div class="sentiment-label" id="lstmLabel">Analyzing...</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="lstmProgress" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function analyzeSentiment() {
+            const input = document.getElementById('reviewInput');
+            const text = input.value.trim();
+            
+            // Validation
+            if (!text) {
+                showError('Please enter some text to analyze');
+                return;
+            }
+
+            // UI updates
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            const errorMessage = document.getElementById('errorMessage');
+            
+            analyzeBtn.disabled = true;
+            loading.classList.add('active');
+            errorMessage.classList.remove('show');
+            results.classList.remove('show');
+
+            try {
+                // Make prediction request
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ text })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Prediction failed');
+                }
+
+                const data = await response.json();
+
+                // Update RNN results
+                updateResults('rnn', data.rnn_result);
+                
+                // Update LSTM results
+                updateResults('lstm', data.lstm_result);
+
+                // Show results
+                setTimeout(() => {
+                    results.classList.add('show');
+                }, 100);
+
+            } catch (error) {
+                showError('Failed to analyze sentiment. Please try again.');
+                console.error('Error:', error);
+            } finally {
+                analyzeBtn.disabled = false;
+                loading.classList.remove('active');
+            }
+        }
+
+        function updateResults(model, result) {
+            const scoreEl = document.getElementById(`${model}Score`);
+            const labelEl = document.getElementById(`${model}Label`);
+            const progressEl = document.getElementById(`${model}Progress`);
+
+            // Update score
+            scoreEl.textContent = `${result.percentage}%`;
+
+            // Update label
+            labelEl.textContent = result.label;
+            labelEl.className = `sentiment-label ${result.label.toLowerCase()}`;
+
+            // Update progress bar
+            progressEl.style.width = `${result.percentage}%`;
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('errorMessage');
+            errorEl.textContent = message;
+            errorEl.classList.add('show');
+            
+            setTimeout(() => {
+                errorEl.classList.remove('show');
+            }, 5000);
+        }
+
+        function clearInput() {
+            document.getElementById('reviewInput').value = '';
+            document.getElementById('results').classList.remove('show');
+        }
+
+        // Allow Enter key to analyze (with Shift+Enter for new line)
+        document.getElementById('reviewInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                analyzeSentiment();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EMNIST Debug Mode</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #16213e;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        h1 { color: #e94560; margin-bottom: 10px; text-align: center; }
+        .status-bar {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+
+        .status-ok { background: #16c79a; color: #1a1a2e; }
+        .status-error { background: #e94560; color: white; }
+        .status-unknown { background: #f39c12; color: #1a1a2e; }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .section {
+            background: #0f3460;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .section h2 {
+            color: #e94560;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+            border-bottom: 2px solid #e94560;
+            padding-bottom: 10px;
+        }
+
+        button {
+            background: #e94560;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+
+        button:hover:not(:disabled) {
+            background: #ff6b6b;
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        .canvas-container {
+            background: white;
+            border-radius: 10px;
+            padding: 10px;
+            display: inline-block;
+            margin: 10px 0;
+        }
+
+        canvas {
+            border: 2px solid #333;
+            border-radius: 5px;
+            cursor: crosshair;
+            background: white;
+        }
+
+        .log-container {
+            background: #1a1a2e;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 5px;
+            border-left: 3px solid;
+            padding-left: 10px;
+        }
+
+        .log-info { border-color: #3498db; color: #3498db; }
+        .log-success { border-color: #16c79a; color: #16c79a; }
+        .log-error { border-color: #e94560; color: #e94560; }
+        .log-warning { border-color: #f39c12; color: #f39c12; }
+
+        .timestamp {
+            color: #666;
+            font-size: 0.9em;
+            margin-right: 10px;
+        }
+
+        .config-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 600px) {
+            .config-panel { grid-template-columns: 1fr; }
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #aaa;
+            font-size: 0.9em;
+        }
+
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #333;
+            border-radius: 5px;
+            background: #1a1a2e;
+            color: #fff;
+        }
+
+        .hidden { display: none !important; }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .result-box {
+            background: #16c79a;
+            color: #1a1a2e;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .result-box.show { display: block; animation: slideIn 0.5s ease; }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .big-char {
+            font-size: 4em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 EMNIST Debug Console</h1>
+        
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <span id="serverStatus" class="status-indicator status-unknown">
+                <span class="dot"></span>
+                <span>Server: Checking...</span>
+            </span>
+            <span id="modelStatus" class="status-indicator status-unknown">
+                <span class="dot"></span>
+                <span>Model: Unknown</span>
+            </span>
+        </div>
+
+        <!-- Configuration -->
+        <div class="section">
+            <h2>⚙️ Server Configuration</h2>
+            <div class="config-panel">
+                <div>
+                    <label>Server URL:</label>
+                    <input type="text" id="serverUrl" value="http://localhost:5000" placeholder="http://localhost:5000">
+                </div>
+                <div>
+                    <label>Request Timeout (ms):</label>
+                    <input type="number" id="timeout" value="10000" placeholder="10000">
+                </div>
+            </div>
+            <button onclick="checkServer()">🔄 Check Connection</button>
+            <button onclick="testEndpoints()">🧪 Test All Endpoints</button>
+        </div>
+
+        <!-- Canvas -->
+        <div class="section">
+            <h2>✍️ Drawing Canvas</h2>
+            <div class="canvas-container">
+                <canvas id="canvas" width="280" height="280"></canvas>
+            </div>
+            <div>
+                <button onclick="clearCanvas()">🗑️ Clear</button>
+                <button onclick="predict()" id="predictBtn">🔍 Predict</button>
+                <button onclick="exportImage()">💾 Export Image</button>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div class="section">
+            <h2>📊 Prediction Results</h2>
+            <div id="resultBox" class="result-box">
+                <div>Predicted:</div>
+                <div class="big-char" id="predictedChar">?</div>
+                <div id="confidence">0%</div>
+            </div>
+            <div id="predictionsList"></div>
+        </div>
+
+        <!-- Logs -->
+        <div class="section">
+            <h2>📜 Debug Logs</h2>
+            <button onclick="clearLogs()">🗑️ Clear Logs</button>
+            <button onclick="exportLogs()">💾 Export Logs</button>
+            <div id="logContainer" class="log-container">
+                <div class="log-entry log-info">
+                    <span class="timestamp">--:--:--</span>
+                    System initialized. Waiting for server check...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        const state = {
+            serverUrl: 'http://localhost:5000',
+            isDrawing: false,
+            lastX: 0,
+            lastY: 0,
+            logs: []
+        };
+
+        // Canvas setup
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        function initCanvas() {
+            ctx.lineWidth = 15;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = '#000000';
+            clearCanvas();
+        }
+
+        function clearCanvas() {
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            log('Canvas cleared', 'info');
+            document.getElementById('resultBox').classList.remove('show');
+        }
+
+        // Drawing events
+        function getPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+            return {
+                x: (clientX - rect.left) * (canvas.width / rect.width),
+                y: (clientY - rect.top) * (canvas.height / rect.height)
+            };
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            state.isDrawing = true;
+            const pos = getPos(e);
+            [state.lastX, state.lastY] = [pos.x, pos.y];
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!state.isDrawing) return;
+            const pos = getPos(e);
+            ctx.beginPath();
+            ctx.moveTo(state.lastX, state.lastY);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+            [state.lastX, state.lastY] = [pos.x, pos.y];
+        });
+
+        canvas.addEventListener('mouseup', () => state.isDrawing = false);
+        canvas.addEventListener('mouseout', () => state.isDrawing = false);
+
+        // Touch support
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent('mousedown', {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            canvas.dispatchEvent(mouseEvent);
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const mouseEvent = new MouseEvent('mousemove', {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            });
+            canvas.dispatchEvent(mouseEvent);
+        });
+
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            const mouseEvent = new MouseEvent('mouseup', {});
+            canvas.dispatchEvent(mouseEvent);
+        });
+
+        // Logging system
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const container = document.getElementById('logContainer');
+            
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.innerHTML = `<span class="timestamp">${timestamp}</span>${message}`;
+            
+            container.appendChild(entry);
+            container.scrollTop = container.scrollHeight;
+            
+            state.logs.push({ time: timestamp, type, message });
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function clearLogs() {
+            document.getElementById('logContainer').innerHTML = '';
+            state.logs = [];
+            log('Logs cleared', 'info');
+        }
+
+        function exportLogs() {
+            const data = JSON.stringify(state.logs, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `debug_logs_${Date.now()}.json`;
+            a.click();
+            log('Logs exported', 'success');
+        }
+
+        function exportImage() {
+            const dataUrl = canvas.toDataURL('image/png');
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = `canvas_${Date.now()}.png`;
+            a.click();
+            log('Image exported to downloads', 'success');
+        }
+
+        // Server communication
+        async function checkServer() {
+            const url = document.getElementById('serverUrl').value;
+            state.serverUrl = url;
+            
+            log(`Checking server at ${url}...`, 'warning');
+            updateStatus('serverStatus', 'checking');
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                
+                const response = await fetch(`${url}/test`, {
+                    signal: controller.signal,
+                    mode: 'cors'
+                });
+                clearTimeout(timeoutId);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ Server connected! Model: ${data.model_loaded ? 'Loaded' : 'Not Loaded'}`, 'success');
+                    updateStatus('serverStatus', 'ok', 'Server: Connected');
+                    updateStatus('modelStatus', data.model_loaded ? 'ok' : 'error', 
+                        data.model_loaded ? 'Model: Loaded' : 'Model: Missing');
+                    return true;
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    log(`❌ Connection timeout (5s)`, 'error');
+                } else if (error.message.includes('Failed to fetch')) {
+                    log(`❌ Cannot connect to ${url}`, 'error');
+                    log(`💡 Is the server running? Check: python app.py`, 'warning');
+                    log(`💡 Check Windows Firewall/Antivirus`, 'warning');
+                } else {
+                    log(`❌ Error: ${error.message}`, 'error');
+                }
+                updateStatus('serverStatus', 'error', 'Server: Offline');
+                updateStatus('modelStatus', 'unknown', 'Model: Unknown');
+                return false;
+            }
+        }
+
+        async function testEndpoints() {
+            const url = state.serverUrl;
+            const endpoints = ['/', '/test', '/debug', '/predict'];
+            
+            log('Testing all endpoints...', 'warning');
+            
+            for (const endpoint of endpoints) {
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 3000);
+                    
+                    const start = performance.now();
+                    const response = await fetch(`${url}${endpoint}`, {
+                        method: endpoint === '/predict' ? 'POST' : 'GET',
+                        signal: controller.signal,
+                        mode: 'cors',
+                        headers: endpoint === '/predict' ? {'Content-Type': 'application/json'} : {},
+                        body: endpoint === '/predict' ? JSON.stringify({image: 'test'}) : null
+                    });
+                    clearTimeout(timeoutId);
+                    
+                    const duration = (performance.now() - start).toFixed(0);
+                    log(`${endpoint}: ${response.status} (${duration}ms)`, 
+                        response.ok ? 'success' : 'warning');
+                        
+                    if (endpoint === '/test' && response.ok) {
+                        const data = await response.json();
+                        log(`  └─ Model: ${data.model_loaded}, Classes: ${data.num_classes}`, 'info');
+                    }
+                } catch (error) {
+                    log(`${endpoint}: FAILED - ${error.message}`, 'error');
+                }
+            }
+        }
+
+        async function predict() {
+            const url = state.serverUrl;
+            const btn = document.getElementById('predictBtn');
+            
+            // Check if canvas is empty
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const pixels = imageData.data;
+            let hasContent = false;
+            for (let i = 0; i < pixels.length; i += 4) {
+                if (pixels[i] < 250) { // Not white
+                    hasContent = true;
+                    break;
+                }
+            }
+            
+            if (!hasContent) {
+                log('Canvas is empty! Draw something first.', 'warning');
+                alert('Please draw a character first!');
+                return;
+            }
+            
+            // Get image
+            const dataUrl = canvas.toDataURL('image/png');
+            log(`Image prepared: ${Math.round(dataUrl.length/1024)}KB`, 'info');
+            
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Sending...';
+            
+            try {
+                const controller = new AbortController();
+                const timeoutMs = parseInt(document.getElementById('timeout').value) || 10000;
+                const timeoutId = setTimeout(() => {
+                    controller.abort();
+                    log(`Request timeout after ${timeoutMs}ms`, 'error');
+                }, timeoutMs);
+                
+                log(`Sending POST to ${url}/predict...`, 'warning');
+                const start = performance.now();
+                
+                const response = await fetch(`${url}/predict`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ image: dataUrl }),
+                    signal: controller.signal,
+                    mode: 'cors'
+                });
+                
+                clearTimeout(timeoutId);
+                const duration = (performance.now() - start).toFixed(0);
+                
+                log(`Response received in ${duration}ms: ${response.status}`, 
+                    response.ok ? 'success' : 'error');
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayResults(data);
+                    log(`Prediction: ${data.top_character} (${(data.top_confidence*100).toFixed(1)}%)`, 'success');
+                } else {
+                    log(`Server error: ${data.error}`, 'error');
+                    alert('Prediction failed: ' + data.error);
+                }
+                
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    log('Request was aborted (timeout)', 'error');
+                    alert('Request timeout! Server took too long to respond.');
+                } else if (error.message.includes('Failed to fetch')) {
+                    log('Network error - is server running?', 'error');
+                    log('Try: 1) Check server console 2) Refresh page 3) Check firewall', 'warning');
+                    alert('Cannot connect to server!\n\n1. Check if python app.py is running\n2. Check Windows Firewall\n3. Try refreshing page');
+                } else {
+                    log(`Unexpected error: ${error.message}`, 'error');
+                    alert('Error: ' + error.message);
+                }
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '🔍 Predict';
+            }
+        }
+
+        function displayResults(data) {
+            document.getElementById('predictedChar').textContent = data.top_character;
+            document.getElementById('confidence').textContent = 
+                `Confidence: ${(data.top_confidence * 100).toFixed(1)}%`;
+            document.getElementById('resultBox').classList.add('show');
+            
+            const list = document.getElementById('predictionsList');
+            list.innerHTML = '<h3 style="margin-top:20px;color:#e94560">Top 3:</h3>';
+            
+            data.predictions.forEach((pred, i) => {
+                const div = document.createElement('div');
+                div.style.cssText = 'background:#0f3460;padding:10px;margin:5px 0;border-radius:5px;display:flex;justify-content:space-between;';
+                div.innerHTML = `
+                    <span>${i+1}. <b>${pred.character}</b></span>
+                    <span>${(pred.confidence * 100).toFixed(1)}%</span>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function updateStatus(id, status, text) {
+            const el = document.getElementById(id);
+            el.className = 'status-indicator status-' + status;
+            el.innerHTML = `<span class="dot"></span><span>${text}</span>`;
+        }
+
+        // Initialize
+        window.onload = () => {
+            initCanvas();
+            log('Debug console initialized', 'info');
+            log('Current server URL: ' + state.serverUrl, 'info');
+            
+            // Auto-check server after 1 second
+            setTimeout(checkServer, 1000);
+        };
+    </script>
+</body>
+</html>
